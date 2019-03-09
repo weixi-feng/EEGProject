@@ -1,15 +1,15 @@
 import numpy as np
 
-def get_train():
-	X_train_valid = np.load('./data/X_train_valid.npy')
-	y_train_valid = np.load('./data/y_train_valid.npy')
-	person_train_valid = np.load('./data/person_train_valid.npy')
+def get_train(path):
+	X_train_valid = np.load(path + 'X_train_valid.npy')
+	y_train_valid = np.load(path + 'y_train_valid.npy')
+	person_train_valid = np.load(path + 'person_train_valid.npy')
 	return X_train_valid, y_train_valid, person_train_valid
 
-def get_test():
-	X_test = np.load('./data/X_test.npy')
-	y_test = np.load('./data/y_test.npy')
-	person_test = np.load('./data/person_test.npy')
+def get_test(path):
+	X_test = np.load(path + 'X_test.npy')
+	y_test = np.load(path + 'y_test.npy')
+	person_test = np.load(path + 'person_test.npy')
 	return X_test, y_test, person_test
 
 
@@ -43,9 +43,9 @@ def shuffle_data(inputs):
     return inputs
 
 
-def get_data():
-    X_train, y_train, person_train = get_train()
-    X_test, y_test, person_test = get_test()
+def get_data(path):
+    X_train, y_train, person_train = get_train(path)
+    X_test, y_test, person_test = get_test(path)
 
     # First 22 are EGG
     X_train, X_test = X_train[:, np.newaxis, :22, :], X_test[:, np.newaxis, :22, :]

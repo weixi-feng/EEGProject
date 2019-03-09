@@ -1,4 +1,4 @@
-from read_data import *
+from utils.read_data import *
 import numpy as np
 import torch
 import torch.nn as nn
@@ -8,7 +8,7 @@ import math
 from model.model import *
 import argparse
 import pickle as pkl
-
+import os
 
 torch.cuda.empty_cache()
 parser = argparse.ArgumentParser(description='EGG classification')
@@ -33,7 +33,9 @@ print("Using %s" % device)
 
 
 # get data and shuffle
-train_data, test_data = get_data()
+abs_path = os.path.abspath('.')
+abs_path = abs_path + '/data/'
+train_data, test_data = get_data(abs_path)
 X_train, y_train, person_train = shuffle_data(train_data)
 X_test, y_test, person_test = shuffle_data(test_data)
 
