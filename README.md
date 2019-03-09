@@ -1,2 +1,5 @@
 # EGGProject
-EGG classification for 239AS
+## Pre-requisite
+Before training or loading models, create a data folder and download the EGG data.
+
+>$ mkdir data
