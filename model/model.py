@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.functional as F
 
 class BaseNet(nn.Module):
 
@@ -51,35 +52,14 @@ class BaseNet(nn.Module):
 class SimpleNet(nn.Module):
     def __init__(self):
         super(SimpleNet, self).__init__()
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=(1, 7), stride=1, padding=(0, 3)),
-            nn.ReLU(),
-            nn.BatchNorm2d(16),
-            nn.MaxPool2d(kernel_size=(1, 7), stride=(1, 5), padding=(0, 3)),
-            nn.Conv2d(16, 32, kernel_size=(1, 3), stride=1, padding=(0, 1)),
-            nn.ReLU(),
-            nn.BatchNorm2d(32),
-            nn.MaxPool2d(kernel_size=(1, 3), stride=(1, 2), padding=(0, 1)),
-            nn.Conv2d(32, 32, kernel_size=(3, 3), stride=1, padding=(1, 1)),
-            nn.ReLU(),
-            nn.BatchNorm2d(32),
-            nn.MaxPool2d(kernel_size=(3, 3), stride=(2, 2), padding=(1, 1)),
-            nn.Conv2d(32, 32, kernel_size=(3, 3), stride=1, padding=(1, 1)),
-            nn.ReLU(),
-            nn.BatchNorm2d(32),
-            nn.MaxPool2d(kernel_size=(1, 3), stride=(1, 2), padding=(0, 1))
-        )
-        self.fc = nn.Sequential(
-            nn.Linear(8800, 4096),
-            nn.ReLU(),
-            nn.Linear(4096, 1000),
-            nn.ReLU(),
-            nn.Linear(1000, 4),
-            nn.Softmax(),
-        )
+        self.conv1 = nn.Conv2d(1, 40, kernel_size=(1, 25), stride=1, padding=0)
+        self.conv2 = nn.Conv2d(40, 1, kernel_size=(44, 1))
+        self.pool = nn.AvgPool2d(kernel_size(1, 75), stride=(1, 15))
+        self.linear = nn.Linear(2440, 4)
 
     def forward(self, x):
-        out = self.conv1(x)
-        out = out.view(out.size(0), -1)
-        out = self.fc(out)
+        out = self.conv2(self.conv1(x))
+        out = torch.sign(out) * torch.sqrt(torch.abs(out))
+        out = torch.log(self.pool(out))
+        out =F.Softmax(self.linear(out))
         return out
