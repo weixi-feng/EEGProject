@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.functional as F
+import torch.nn.functional as F
 
 class BaseNet(nn.Module):
 
@@ -53,13 +53,13 @@ class SimpleNet(nn.Module):
     def __init__(self):
         super(SimpleNet, self).__init__()
         self.conv1 = nn.Conv2d(1, 40, kernel_size=(1, 25), stride=1, padding=0)
-        self.conv2 = nn.Conv2d(40, 1, kernel_size=(44, 1))
-        self.pool = nn.AvgPool2d(kernel_size(1, 75), stride=(1, 15))
+        self.conv2 = nn.Conv2d(40, 1, kernel_size=(22, 1))
+        self.pool = nn.AvgPool2d(kernel_size=(1, 75), stride=(1, 15))
         self.linear = nn.Linear(2440, 4)
 
     def forward(self, x):
         out = self.conv2(self.conv1(x))
         out = torch.sign(out) * torch.sqrt(torch.abs(out))
         out = torch.log(self.pool(out))
-        out =F.Softmax(self.linear(out))
+        out =F.softmax(self.linear(out))
         return out
