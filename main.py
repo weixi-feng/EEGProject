@@ -66,7 +66,7 @@ elif args.model == 'base':
     basenet = BaseNet()
 elif args.model == 'kernel':
     basenet = KernelNet()
-elif args.model == 'simplev2':
+elif args.model == 'simple_v2':
     basenet = SimpleNet_v2()
 else:
     raise RuntimeError('Wrong model!')
