@@ -64,3 +64,20 @@ class SimpleNet(nn.Module):
         out = out.view(out.size(0), -1)
         out = F.softmax(self.linear(out))
         return out
+
+
+class SimpleNet_v2(nn.Module):
+    def __init__(self):
+        super(SimpleNet_v2, self).__init__()
+        self.conv1 = nn.Conv2d(1, 40, kernel_size=(1, 25), stride=1, padding=0) # Nx40x22x476
+        self.conv2 = nn.Conv2d(40, 40, kernel_size=(22, 1)) # Nx40x1x476
+        self.pool = nn.AvgPool2d(kernel_size=(1, 75), stride=(1, 15)) # Nx40x1x27
+        self.linear = nn.Linear(1080, 4)
+
+    def forward(self, x):
+        out = self.conv2(self.conv1(x))
+        out = torch.pow(out, 2)
+        out = torch.log(self.pool(out))
+        out = out.view(out.size(0), -1)
+        out = F.softmax(self.linear(out), dim=1)
+        return out
