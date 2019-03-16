@@ -59,7 +59,8 @@ class SimpleNet(nn.Module):
 
     def forward(self, x):
         out = self.conv2(self.conv1(x))
-        out = torch.sign(out) * torch.sqrt(torch.abs(out))
+        out = torch.pow(out, 2)
         out = torch.log(self.pool(out))
-        out =F.softmax(self.linear(out))
+        out = out.view(out.size(0), -1)
+        out = F.softmax(self.linear(out))
         return out
