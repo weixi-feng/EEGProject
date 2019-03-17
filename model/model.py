@@ -7,26 +7,26 @@ class BaseNet(nn.Module):
     def __init__(self):
         super(BaseNet, self).__init__()
         self.conv1 = nn.Conv2d(1, 25, kernel_size=(1, 25), padding=(0, 12))
-        self.conv2 = nn.Conv3d(1, 25, kernel_size=(25, 22, 1))
+        self.conv2 = nn.Conv2d(25, 25, kernel_size=(22, 1))
         self.elu = nn.ELU(alpha=1)
-        self.maxpool1 = nn.MaxPool2d(kernel_size=(1, 3), stride=(1, 3), padding=(0, 1))
+        self.maxpool1 = nn.MaxPool2d(kernel_size=(1, 3), stride=(1, 3))
         self.block2 = nn.Sequential(
-            nn.Conv2d(1, 50, kernel_size=(25, 10)),
+            nn.Conv2d(25, 50, kernel_size=(1, 10)),
             nn.ELU(alpha=1),
-            nn.MaxPool2d(kernel_size=(1, 3), stride=(1, 3), padding=(0, 1)),
+            nn.MaxPool2d(kernel_size=(1, 3), stride=(1, 3)),
         )
         self.block3 = nn.Sequential(
-            nn.Conv2d(1, 100, kernel_size=(50, 13)),
+            nn.Conv2d(50, 100, kernel_size=(1, 10)),
             nn.ELU(alpha=1),
-            nn.MaxPool2d(kernel_size=(1, 3), stride=(1, 3), padding=(0, 1)),
+            nn.MaxPool2d(kernel_size=(1, 3), stride=(1, 3)),
         )
         self.block4 = nn.Sequential(
-            nn.Conv2d(1, 200, kernel_size=(100, 10)),
+            nn.Conv2d(100, 200, kernel_size=(1, 10), padding=(0, 1)),
             nn.ELU(alpha=1),
-            nn.MaxPool2d(kernel_size=(1, 3), stride=(1, 3), padding=(0, 1)),
+            nn.MaxPool2d(kernel_size=(1, 3), stride=(1, 3)),
         )
         self.fc = nn.Sequential(
-            nn.Linear(1600, 4),
+            nn.Linear(400, 4),
             nn.Softmax(1)
         )
 
@@ -81,3 +81,37 @@ class SimpleNet_v2(nn.Module):
         out = out.view(out.size(0), -1)
         out = F.softmax(self.linear(out), dim=1)
         return out
+
+class SimpleNet_v3(nn.Module):
+    def __init__(self, ksize):
+        super(SimpleNet_v3, self).__init__()
+        self.conv1 = nn.Conv2d(1, 40, kernel_size=(1, ksize), stride=1, padding=(0, (ksize-1)/2)) # Nx40x22x500
+        self.conv2 = nn.Conv2d(40, 40, kernel_size=(22, 1)) # Nx40x1x500
+        self.pool = nn.AvgPool2d(kernel_size=(1, 75), stride=(1, 15)) # Nx40x1x29
+
+    def forward(self, x):
+        out = self.conv2(self.conv1(x))
+        out = torch.pow(out, 2)
+        out = torch.log(self.pool(out))
+        return out
+
+
+class Inception(nn.Module):
+    def __init__(self):
+        super(Inception, self).__init__()
+        self.block1 = SimpleNet_v3(ksize=25)
+        self.block2 = SimpleNet_v3(ksize=35)
+        self.block3 = SimpleNet_v3(ksize=15)
+        self.conv = nn.Conv2d(120, 60, kernel_size=1, stride=1)
+        self.linear = nn.Linear(1740, 4)
+
+    def forward(self, x):
+        b1 = self.block1(x)
+        b2 = self.block2(x)
+        b3 = self.block3(x)
+        out = torch.cat((b1, b2, b3), 1)
+        out = self.conv(out)
+        out = out.view(out.size(0), -1)
+        out = F.softmax(self.linear(out), 1)
+        return out
+        
