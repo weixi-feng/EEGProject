@@ -1,4 +1,5 @@
 import numpy as np
+import random
 
 def get_train(path):
 	X_train_valid = np.load(path + 'X_train_valid.npy')
@@ -56,18 +57,53 @@ def get_data(path):
     return ([X_train, y_train, person_train],[X_test, y_test, person_test])
 
 def crop_data(X, y, train=False, step=2):
-    num_samples, H, W = X.shape
-    X_new = np.zeros((num_samples*step, W, int(W/step)))
+    print("Performing naive crop...")
+    num_samples, _, H, W = X.shape
+    X_new = np.zeros((num_samples*step, 1, H, int(W/step)))
     for s in range(step):
-        idx = list(range(s, 1000, step)) + [-1]
-        X_new[s*num_samples:(s+1)*num_samples,...] = X[:, H, idx]
-    y_new = np.repeat(y, step, axis=1)
+        idx = list(range(s, 1000, step))
+        X_new[s*num_samples:(s+1)*num_samples,...] = X[..., idx]
+    y_new = np.reshape(np.repeat(y.T, step, axis=0), (-1,1))
     if train:
         num_val = int(0.2*num_samples*step)
-        val_idx = np.random.randint(0, num_samples*step, (num_val,))
+        val_idx = random.sample(range(0, num_samples*step), num_val)
         X_val, y_val = X_new[val_idx,...], y_new[val_idx,...]
         train_idx = [element for element in list(range(num_samples*step)) if element not in val_idx]
         X_train, y_train = X_new[train_idx,...], y_new[train_idx,...]
-        return X_train, y_train, X_val, y_val
+        print("==>Crop complete, %d training data, %d validation data" % (X_train.shape[0], X_val.shape[0]))
+        return X_train, y_train, X_val, y_val, step
     else:
-        return X_new[:num_samples,...], y_new[:num_samples,...]
+        print("==>Crop complete, %d testing data" % X_new.shape[0])
+        return X_new, y_new, step
+
+def neighbour_crop(X, y, train=False, step=2, start=0, end=1000):
+    print("Performing neighbour crop...")
+    N = int((end-start-500)/step) + 1
+    num_samples, _, H, W = X.shape
+    Xnew = np.zeros((N*num_samples, 1, H, 500))
+    ynew = np.zeros((N*num_samples, 1))
+    if train:
+        for i in range(num_samples):
+            for n, s in enumerate(range(start, end-499, step)):
+                idx = list(range(s, s+500))
+                Xnew[i*N+n, :, :, :] = X[i, :, :, idx].transpose(1,2,0)
+                ynew[i*N+n, ...] = y[i, ...]
+        
+        num_val = int(0.2*num_samples)
+        idx_list = random.sample(range(0, num_samples), num_val)
+        val_idx = []
+        for vi in idx_list:
+            for n in range(N):
+                val_idx.append(vi+N)
+        X_val, y_val = Xnew[val_idx,...], ynew[val_idx,...]
+        train_idx = [element for element in list(range(N*num_samples)) if element not in val_idx]
+        X_train, y_train = Xnew[train_idx,...], ynew[train_idx,...]
+        print("==>Crop complete, %d training data, %d validation data" % (X_train.shape[0], X_val.shape[0]))
+        return X_train, y_train, X_val, y_val, N
+    else:
+        for n, s in enumerate(range(start, end-499, step)):
+            idx = list(range(s, s+500))
+            Xnew[n*num_samples:(n+1)*num_samples, ...] = np.take(X, idx, axis=-1)
+            ynew[n*num_samples:(n+1)*num_samples, ...] = y
+        print("==>Crop complete, %d testing data" % Xnew.shape[0])
+        return Xnew, ynew, N
