@@ -56,7 +56,7 @@ def get_data(path):
 
     return ([X_train, y_train, person_train],[X_test, y_test, person_test])
 
-def crop_data(X, y, train=False, step=2):
+def naive_crop(X, y, train=False, step=2):
     print("Performing naive crop...")
     num_samples, _, H, W = X.shape
     X_new = np.zeros((num_samples*step, 1, H, int(W/step)))
@@ -81,15 +81,16 @@ def fancy_crop(X, y, train=False, length=2, fold=2):
     num_samples, _, H, W = X.shape
     overlap = int((500*length-1000)/499)
     stride = length - overlap
-    start_list = np.arange(0, 1000, stride))
+    start_list = np.arange(0, 1000, stride)
     m = int((1000+stride-length)/stride)
-    X_new = np.zeros((num_samples*fold, 1, H, 500)
+    X_new = np.zeros((num_samples*fold, 1, H, 500))
     for f in range(fold):
         temp = np.random.randint(0, length-1, (500,))
         idx = start_list + temp
-        idx = np.append(idx[:m-500], np.random.randint(980, 1000, 500-m))
+        if m != 500:
+            idx = np.append(idx[:m-500], np.random.randint(980, 1000, 500-m))
         X_new[f*num_samples:(f+1)*num_samples,...] = X[..., idx]
-    y_new = np.reshape(np.repeat(y.T, fold, axis=0)， (-1,1))
+    y_new = np.reshape(np.repeat(y.T, fold, axis=0), (-1,1))
     if train:
         num_val = int(0.2*num_samples*fold)
         val_idx = random.sample(range(0, num_samples*fold), num_val)
@@ -97,7 +98,7 @@ def fancy_crop(X, y, train=False, length=2, fold=2):
         train_idx = [element for element in list(range(num_samples*fold)) if element not in val_idx]
         X_train, y_train = X_new[train_idx,...], y_new[train_idx,...]
         print("==>Crop complete, %d training data, %d validation data" % (X_train.shape[0], X_val.shape[0]))
-        return X_train, y_train, X_val, y_val, step
+        return X_train, y_train, X_val, y_val, fold
     else:
         print("==>Crop complete, %d testing data" % X_new.shape[0])
         return X_new, y_new, fold
