@@ -54,3 +54,20 @@ def get_data(path):
     y_test = np.reshape(label_encode(y_test), (-1, 1))
 
     return ([X_train, y_train, person_train],[X_test, y_test, person_test])
+
+def crop_data(X, y, train=False, step=2):
+    num_samples, H, W = X.shape
+    X_new = np.zeros((num_samples*step, W, int(W/step)))
+    for s in range(step):
+        idx = list(range(s, 1000, step)) + [-1]
+        X_new[s*num_samples:(s+1)*num_samples,...] = X[:, H, idx]
+    y_new = np.repeat(y, step, axis=1)
+    if train:
+        num_val = int(0.2*num_samples*step)
+        val_idx = np.random.randint(0, num_samples*step, (num_val,))
+        X_val, y_val = X_new[val_idx,...], y_new[val_idx,...]
+        train_idx = [element for element in list(range(num_samples*step)) if element not in val_idx]
+        X_train, y_train = X_new[train_idx,...], y_new[train_idx,...]
+        return X_train, y_train, X_val, y_val
+    else:
+        return X_new[:num_samples,...], y_new[:num_samples,...]
