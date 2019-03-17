@@ -17,8 +17,8 @@ parser.add_argument('--epoch',  default=10, type=int, help='training epoch')
 parser.add_argument('--optim', default='adam', type=str, help='select optimizer, either sgd or adam')
 parser.add_argument('--model', default='base', type=str, help='Select model')
 parser.add_argument('--load', action='store_true', help='Load the best stored model')
+parser.add_argument('--crop', default='naive', type=str, help='data crop, naive/neighbour')
 args = parser.parse_args()
-
 
 
 # Hyperparameters
@@ -30,30 +30,46 @@ batch_size = 64
 # define deivce
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print("Using %s" % device)
-
+step = 53
 
 # get data
 abs_path = os.path.abspath('.')
 abs_path = abs_path + '/data/'
 train_data, test_data = get_data(abs_path)
-# shuffle
+
+# Shuffle data
 X_train, y_train, person_train = shuffle_data(train_data)
 X_test, y_test, person_test = shuffle_data(test_data)
 
-X_train, y_train, X_val, y_val = crop_data(X_train, y_train, train=True)
-X_test, y_test = crop_data(X_test, y_test)
+
+if args.crop == 'naive':
+    X_train, y_train, X_val, y_val, _ = crop_data(X_train, y_train, train=True)
+    X_test_c, y_test_c, N = crop_data(X_test, y_test)
+elif args.crop == 'neighbour':
+    X_train, y_train, X_val, y_val, N = neighbour_crop(X_train, y_train, train=True, step=step)
+    X_test_c, y_test_c, N = neighbour_crop(X_test, y_test, step=step)
+elif args.crop == 'neighbor':
+    raise RuntimeError('Please type in British Spelling!')
+else:
+    raise RuntimeError('Wrong input, naive or neighbour!')
+
+X_train, y_train = torch.from_numpy(X_train), torch.from_numpy(y_train)
+train = data_utils.TensorDataset(X_train.type(torch.FloatTensor), y_train.type(torch.LongTensor))
+trainloader = data_utils.DataLoader(train, batch_size=batch_size, shuffle=False)
+
 X_val, y_val = torch.from_numpy(X_val), torch.from_numpy(y_val)
 val = data_utils.TensorDataset(X_val.type(torch.FloatTensor), y_val.type(torch.LongTensor))
 valloader = data_utils.DataLoader(val, batch_size=batch_size, shuffle=False)
 
-# Create dataloader
-X_train, y_train = torch.from_numpy(X_train), torch.from_numpy(y_train)
-X_test, y_test = torch.from_numpy(X_test), torch.from_numpy(y_test)
-
-train = data_utils.TensorDataset(X_train.type(torch.FloatTensor), y_train.type(torch.LongTensor))
-trainloader = data_utils.DataLoader(train, batch_size=batch_size, shuffle=True)
-test = data_utils.TensorDataset(X_test.type(torch.FloatTensor), y_test.type(torch.LongTensor))
-testloader = data_utils.DataLoader(test, batch_size=batch_size, shuffle=False)
+X_test_list = np.split(X_test_c, N, axis=0)
+y_test_list = np.split(y_test_c, N, axis=0)
+testloader_list = []
+for i in range(N):
+    X, y = torch.from_numpy(X_test_list[i]), torch.from_numpy(y_test_list[i])
+    test = data_utils.TensorDataset(X.type(torch.FloatTensor), y.type(torch.LongTensor))
+    testloader = data_utils.DataLoader(test, batch_size=batch_size, shuffle=False)
+    testloader_list.append(testloader)
+y_test = torch.from_numpy(y_test).type(torch.LongTensor)
 
 batch_num = math.ceil(X_train.shape[0]/batch_size)
 
@@ -94,7 +110,6 @@ def weights_init(m):
         torch.nn.init.xavier_uniform_(m.weight)
         if m.bias is not None:
             torch.nn.init.zeros_(m.bias)
-## basenet.apply(weights_init)
 
 
 def train(epoch):
@@ -115,39 +130,56 @@ def train(epoch):
     print('Epoch %d, training loss: %f' % (epoch+1, train_loss/batch_num))
     loss_history.append(train_loss/batch_num)
 
-def test(val=False):
-    if val:
-        loader = valloader
-        num_samples = X_val.shape[0]
-    else:
-        loader = testloader
-        num_samples = X_test.shape[0]
-    test_batch_num = math.ceil(X_test.shape[0]/batch_size)
+
+def val():
+    num_samples = X_val.shape[0]
     basenet.eval()
     corrected = 0
     with torch.no_grad():
-        for idx, (inputs, targets) in enumerate(loader):
+        for idx, (inputs, targets) in enumerate(valloader):
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = basenet(inputs)
             _, predict = outputs.max(1)
             corrected += int(torch.sum(predict==targets.view(-1)).item())
     test_acc = 100*corrected/(num_samples)
-    if val:
-        print('Validation accuracy: %f' % test_acc)
-    else:
-        print('Test accuracy: %f' % test_acc)
+    print('Validation accuracy: %f' % test_acc)
+    return test_acc
+
+
+def test(y_test):
+    num_samples = X_test.shape[0]
+    scores = torch.zeros((num_samples, 4))
+    scores = scores.to(device)
+    for i in range(N):
+        score = 0
+        loader = testloader_list[i]
+        basenet.eval()
+        corrected = 0
+        with torch.no_grad():
+            for idx, (inputs, targets) in enumerate(loader):
+                inputs, targets = inputs.to(device), targets.to(device)
+                outputs = basenet(inputs)
+                score = outputs if idx==0 else torch.cat((score, outputs), dim=0)
+        scores += score
+    scores /= N 
+    _, predict = scores.max(1)
+    y_test = y_test.to(device)
+    corrected = int(torch.sum(predict==y_test.view(-1)).item())
+    test_acc = 100*corrected/(num_samples)
+    print('Test accuracy: %f' % test_acc)
     return test_acc
 
 # Training
 test_accuracy = 0
 val_accuracy = 0
+print("Start training!")
 for epo in range(args.epoch):
     train(epo)
-    val_accuracy = test(val=True)
+    val_accuracy = val()
     if val_accuracy >= 90:
         break
 
-test_accuracy = test()
+test_accuracy = test(y_test)
 
 with open('./model/model_acc.p', 'rb') as file:
     model_acc = pkl.load(file)
