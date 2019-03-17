@@ -30,7 +30,8 @@ batch_size = 64
 # define deivce
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print("Using %s" % device)
-step = 53
+step = 3
+fold = 4
 
 # get data
 abs_path = os.path.abspath('.')
@@ -43,13 +44,16 @@ X_test, y_test, person_test = shuffle_data(test_data)
 
 
 if args.crop == 'naive':
-    X_train, y_train, X_val, y_val, _ = crop_data(X_train, y_train, train=True)
-    X_test_c, y_test_c, N = crop_data(X_test, y_test)
+    X_train, y_train, X_val, y_val, _ = naive_crop(X_train, y_train, train=True)
+    X_test_c, y_test_c, N = naive_crop(X_test, y_test)
 elif args.crop == 'neighbour':
-    X_train, y_train, X_val, y_val, N = neighbour_crop(X_train, y_train, train=True, step=step)
-    X_test_c, y_test_c, N = neighbour_crop(X_test, y_test, step=step)
+    X_train, y_train, X_val, y_val, N = neighbour_crop(X_train, y_train, train=True, step=step, start=200, end=710)
+    X_test_c, y_test_c, N = neighbour_crop(X_test, y_test, step=step, start=200, end=710)
 elif args.crop == 'neighbor':
     raise RuntimeError('Please type in British Spelling!')
+elif args.crop == 'fancy':
+    X_train, y_train, X_val, y_val, N = fancy_crop(X_train, y_train, train=True, length=2, fold=fold)
+    X_test_c, y_test_c, N = fancy_crop(X_test, y_test, length=2, fold=fold)
 else:
     raise RuntimeError('Wrong input, naive or neighbour!')
 
@@ -80,8 +84,8 @@ if args.model == 'simple':
     basenet = SimpleNet()
 elif args.model == 'base':
     basenet = BaseNet()
-elif args.model == 'kernel':
-    basenet = KernelNet()
+elif args.model == 'inception':
+    basenet = Inception()
 elif args.model == 'simple_v2':
     basenet = SimpleNet_v2()
 else:
@@ -176,7 +180,7 @@ print("Start training!")
 for epo in range(args.epoch):
     train(epo)
     val_accuracy = val()
-    if val_accuracy >= 90:
+    if val_accuracy >= 95 or epo>=70:
         break
 
 test_accuracy = test(y_test)
@@ -184,8 +188,12 @@ test_accuracy = test(y_test)
 with open('./model/model_acc.p', 'rb') as file:
     model_acc = pkl.load(file)
 
+try:
+    max_acc = model_acc[args.model]
+except:
+    max_acc = 0
 
-if test_accuracy >= model_acc[args.model]:
+if test_accuracy >= max_acc:
     model_acc[args.model] = test_accuracy
     torch.save({
         'epoch': epoch+epoch_old,
